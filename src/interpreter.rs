@@ -1,4 +1,4 @@
-use std::io::{self, BufWriter, Read, Write};
+use std::io::{self, Read};
 
 #[derive(Debug)]
 pub enum BrainfuckError {
@@ -93,8 +93,6 @@ impl BrainfuckInterpreter {
         #[cfg(any(test, debug_assertions))]
         eprintln!("Debug: Setting up buffered output");
 
-        let mut output = BufWriter::new(io::stdout());
-
         #[cfg(any(test, debug_assertions))]
         eprintln!(
             "Debug: Starting execution loop ({} instructions)",
@@ -104,9 +102,7 @@ impl BrainfuckInterpreter {
         let sourcelen = self.source.len();
 
         while self.instruction_pointer < sourcelen {
-            let command = self.source[self.instruction_pointer];
-
-            match command {
+            match self.source[self.instruction_pointer] {
                 b'+' => {
                     self.memory[self.data_pointer] = self.memory[self.data_pointer].wrapping_add(1);
                 }
@@ -121,7 +117,7 @@ impl BrainfuckInterpreter {
                     if self.data_pointer == 0 {
                         return Err(BrainfuckError::MemoryUnderflow);
                     }
-                    self.data_pointer -= 1;
+                    self.data_pointer = self.data_pointer.saturating_sub(1);
                 }
                 b'[' => {
                     if self.memory[self.data_pointer] == 0 {
@@ -134,9 +130,7 @@ impl BrainfuckInterpreter {
                     }
                 }
                 b'.' => {
-                    write!(output, "{}", self.memory[self.data_pointer] as char)
-                        .map_err(BrainfuckError::IoError)?;
-                    output.flush().map_err(BrainfuckError::IoError)?;
+                    print!("{}", self.memory[self.data_pointer] as char);
                 }
                 b',' => {
                     let mut buffer = [0; 1];
@@ -158,8 +152,6 @@ impl BrainfuckInterpreter {
         }
         #[cfg(any(test, debug_assertions))]
         eprintln!("Debug: Flushing output buffer");
-
-        output.flush().map_err(BrainfuckError::IoError)?;
 
         #[cfg(any(test, debug_assertions))]
         eprintln!(
