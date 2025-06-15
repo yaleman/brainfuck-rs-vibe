@@ -140,6 +140,7 @@ impl BrainfuckInterpreter {
                 b'.' => {
                     write!(output, "{}", self.memory[self.data_pointer] as char)
                         .map_err(BrainfuckError::IoError)?;
+                    output.flush().map_err(BrainfuckError::IoError)?;
                 }
                 b',' => {
                     let mut buffer = [0; 1];
