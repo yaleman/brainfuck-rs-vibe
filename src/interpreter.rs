@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::io::{self, BufWriter, Read, Write};
 
 #[derive(Debug)]
@@ -29,7 +28,7 @@ pub struct BrainfuckInterpreter {
     data_pointer: usize,
     instruction_pointer: usize,
     source: Vec<u8>,
-    bracket_map: BTreeMap<usize, usize>,
+    bracket_map: Vec<usize>,
 }
 
 impl BrainfuckInterpreter {
@@ -58,8 +57,8 @@ impl BrainfuckInterpreter {
         })
     }
 
-    fn build_bracket_map(source: &[u8]) -> Result<BTreeMap<usize, usize>, BrainfuckError> {
-        let mut bracket_map = BTreeMap::new();
+    fn build_bracket_map(source: &[u8]) -> Result<Vec<usize>, BrainfuckError> {
+        let mut bracket_map = vec![0; source.len()];
         let mut stack = Vec::new();
 
         for (i, &ch) in source.iter().enumerate() {
@@ -67,8 +66,8 @@ impl BrainfuckInterpreter {
                 b'[' => stack.push(i),
                 b']' => {
                     if let Some(start) = stack.pop() {
-                        bracket_map.insert(start, i);
-                        bracket_map.insert(i, start);
+                        bracket_map[start] = i;
+                        bracket_map[i] = start;
                     } else {
                         return Err(BrainfuckError::UnmatchedBracket(i));
                     }
@@ -102,16 +101,16 @@ impl BrainfuckInterpreter {
             self.source.len()
         );
 
-        while self.instruction_pointer < self.source.len() {
+        let sourcelen = self.source.len();
+
+        while self.instruction_pointer < sourcelen {
             let command = self.source[self.instruction_pointer];
 
             match command {
                 b'+' => {
-                    self.ensure_memory_capacity();
                     self.memory[self.data_pointer] = self.memory[self.data_pointer].wrapping_add(1);
                 }
                 b'-' => {
-                    self.ensure_memory_capacity();
                     self.memory[self.data_pointer] = self.memory[self.data_pointer].wrapping_sub(1);
                 }
                 b'>' => {
@@ -126,12 +125,12 @@ impl BrainfuckInterpreter {
                 }
                 b'[' => {
                     if self.memory[self.data_pointer] == 0 {
-                        self.instruction_pointer = self.bracket_map[&self.instruction_pointer];
+                        self.instruction_pointer = self.bracket_map[self.instruction_pointer];
                     }
                 }
                 b']' => {
                     if self.memory[self.data_pointer] != 0 {
-                        self.instruction_pointer = self.bracket_map[&self.instruction_pointer];
+                        self.instruction_pointer = self.bracket_map[self.instruction_pointer];
                     }
                 }
                 b'.' => {
