@@ -14,18 +14,13 @@ struct Args {
     /// Ignore input commands (,) - they will be skipped
     #[arg(long)]
     ignore_input: bool,
-
-    /// Enable debug output to stderr
-    #[arg(long)]
-    debug: bool,
 }
 
 fn main() {
     let args = Args::parse();
 
-    if args.debug {
-        eprintln!("Debug: Reading source file '{}'", args.file);
-    }
+    #[cfg(any(test, debug_assertions))]
+    eprintln!("Debug: Reading source file '{}'", args.file);
 
     let source = match fs::read_to_string(&args.file) {
         Ok(content) => content,
@@ -35,12 +30,13 @@ fn main() {
         }
     };
 
-    if args.debug {
+    #[cfg(any(test, debug_assertions))]
+    {
         eprintln!("Debug: Read {} characters from file", source.len());
         eprintln!("Debug: Creating interpreter");
     }
 
-    let mut interpreter = match BrainfuckInterpreter::new(source, args.debug) {
+    let mut interpreter = match BrainfuckInterpreter::new(source) {
         Ok(interpreter) => interpreter,
         Err(e) => {
             eprintln!("Error creating interpreter: {}", e);
@@ -48,16 +44,14 @@ fn main() {
         }
     };
 
-    if args.debug {
-        eprintln!("Debug: Starting execution");
-    }
+    #[cfg(any(test, debug_assertions))]
+    eprintln!("Debug: Starting execution");
 
     if let Err(e) = interpreter.execute() {
         eprintln!("Runtime error: {}", e);
         process::exit(1);
     }
 
-    if args.debug {
-        eprintln!("Debug: Execution completed successfully");
-    }
+    #[cfg(any(test, debug_assertions))]
+    eprintln!("Debug: Execution completed successfully");
 }

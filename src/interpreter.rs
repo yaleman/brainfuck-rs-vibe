@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::{self, BufWriter, Read, Write};
 
 #[derive(Debug)]
@@ -29,23 +29,22 @@ pub struct BrainfuckInterpreter {
     data_pointer: usize,
     instruction_pointer: usize,
     source: Vec<u8>,
-    bracket_map: HashMap<usize, usize>,
-    debug: bool,
+    bracket_map: BTreeMap<usize, usize>,
 }
 
 impl BrainfuckInterpreter {
-    pub fn new(source: String, debug: bool) -> Result<Self, BrainfuckError> {
-        if debug {
-            eprintln!("Debug: Converting source to bytes ({} chars)", source.len());
-        }
+    pub fn new(source: String) -> Result<Self, BrainfuckError> {
+        #[cfg(any(test, debug_assertions))]
+        eprintln!("Debug: Converting source to bytes ({} chars)", source.len());
         let source_bytes = source.as_bytes().to_vec();
 
-        if debug {
-            eprintln!("Debug: Building bracket map");
-        }
+        #[cfg(any(test, debug_assertions))]
+        eprintln!("Debug: Building bracket map");
+
         let bracket_map = Self::build_bracket_map(&source_bytes)?;
 
-        if debug {
+        #[cfg(any(test, debug_assertions))]
+        {
             eprintln!("Debug: Found {} bracket pairs", bracket_map.len() / 2);
             eprintln!("Debug: Initializing memory with 30,000 cells");
         }
@@ -56,12 +55,11 @@ impl BrainfuckInterpreter {
             instruction_pointer: 0,
             source: source_bytes,
             bracket_map,
-            debug,
         })
     }
 
-    fn build_bracket_map(source: &[u8]) -> Result<HashMap<usize, usize>, BrainfuckError> {
-        let mut bracket_map = HashMap::new();
+    fn build_bracket_map(source: &[u8]) -> Result<BTreeMap<usize, usize>, BrainfuckError> {
+        let mut bracket_map = BTreeMap::new();
         let mut stack = Vec::new();
 
         for (i, &ch) in source.iter().enumerate() {
@@ -93,17 +91,16 @@ impl BrainfuckInterpreter {
     }
 
     pub fn execute(&mut self) -> Result<(), BrainfuckError> {
-        if self.debug {
-            eprintln!("Debug: Setting up buffered output");
-        }
+        #[cfg(any(test, debug_assertions))]
+        eprintln!("Debug: Setting up buffered output");
+
         let mut output = BufWriter::new(io::stdout());
 
-        if self.debug {
-            eprintln!(
-                "Debug: Starting execution loop ({} instructions)",
-                self.source.len()
-            );
-        }
+        #[cfg(any(test, debug_assertions))]
+        eprintln!(
+            "Debug: Starting execution loop ({} instructions)",
+            self.source.len()
+        );
 
         while self.instruction_pointer < self.source.len() {
             let command = self.source[self.instruction_pointer];
@@ -160,18 +157,17 @@ impl BrainfuckInterpreter {
 
             self.instruction_pointer += 1;
         }
+        #[cfg(any(test, debug_assertions))]
+        eprintln!("Debug: Flushing output buffer");
 
-        if self.debug {
-            eprintln!("Debug: Flushing output buffer");
-        }
         output.flush().map_err(BrainfuckError::IoError)?;
 
-        if self.debug {
-            eprintln!(
-                "Debug: Execution completed after {} instructions",
-                self.instruction_pointer
-            );
-        }
+        #[cfg(any(test, debug_assertions))]
+        eprintln!(
+            "Debug: Execution completed after {} instructions",
+            self.instruction_pointer
+        );
+
         Ok(())
     }
 }
