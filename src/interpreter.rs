@@ -26,7 +26,6 @@ impl std::error::Error for BrainfuckError {}
 pub struct BrainfuckInterpreter {
     memory: Vec<u8>,
     data_pointer: usize,
-    instruction_pointer: usize,
     source: Vec<u8>,
     bracket_map: Vec<usize>,
 }
@@ -51,7 +50,6 @@ impl BrainfuckInterpreter {
         Ok(BrainfuckInterpreter {
             memory: vec![0; 30000],
             data_pointer: 0,
-            instruction_pointer: 0,
             source: source_bytes,
             bracket_map,
         })
@@ -88,6 +86,37 @@ impl BrainfuckInterpreter {
             self.memory.resize(self.memory.len() + 1000, 0);
         }
     }
+    fn fn_greater_than(&mut self) {
+        self.data_pointer += 1;
+        self.ensure_memory_capacity();
+    }
+    fn fn_less_than(&mut self) -> Result<(), BrainfuckError> {
+        if self.data_pointer == 0 {
+            return Err(BrainfuckError::MemoryUnderflow);
+        }
+        self.data_pointer = self.data_pointer.saturating_sub(1);
+        Ok(())
+    }
+    fn fn_minus(&mut self) {
+        self.memory[self.data_pointer] = self.memory[self.data_pointer].wrapping_sub(1)
+    }
+    fn fn_plus(&mut self) {
+        self.memory[self.data_pointer] = self.memory[self.data_pointer].wrapping_add(1)
+    }
+    fn fn_comma(&mut self) -> Result<(), BrainfuckError> {
+        let mut buffer = [0; 1];
+
+        match io::stdin().read_exact(&mut buffer) {
+            Ok(_) => {
+                self.memory[self.data_pointer] = buffer[0];
+            }
+            Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
+                // EOF - leave cell unchanged as per spec
+            }
+            Err(err) => return Err(BrainfuckError::IoError(err)),
+        }
+        Ok(())
+    }
 
     pub fn execute(&mut self) -> Result<(), BrainfuckError> {
         #[cfg(any(test, debug_assertions))]
@@ -100,55 +129,37 @@ impl BrainfuckInterpreter {
         );
 
         let sourcelen = self.source.len();
-
-        while self.instruction_pointer < sourcelen {
-            match self.source[self.instruction_pointer] {
-                b'+' => {
-                    self.memory[self.data_pointer] = self.memory[self.data_pointer].wrapping_add(1);
-                }
-                b'-' => {
-                    self.memory[self.data_pointer] = self.memory[self.data_pointer].wrapping_sub(1);
-                }
-                b'>' => {
-                    self.data_pointer += 1;
-                    self.ensure_memory_capacity();
-                }
+        let mut instruction_pointer = 0;
+        while instruction_pointer < sourcelen {
+            match &self.source[instruction_pointer] {
+                b'+' => self.fn_plus(),
+                b'-' => self.fn_minus(),
+                b'>' => self.fn_greater_than(),
                 b'<' => {
-                    if self.data_pointer == 0 {
-                        return Err(BrainfuckError::MemoryUnderflow);
-                    }
-                    self.data_pointer = self.data_pointer.saturating_sub(1);
+                    self.fn_less_than()?;
                 }
                 b'[' => {
                     if self.memory[self.data_pointer] == 0 {
-                        self.instruction_pointer = self.bracket_map[self.instruction_pointer];
+                        instruction_pointer = self.bracket_map[instruction_pointer];
                     }
                 }
                 b']' => {
                     if self.memory[self.data_pointer] != 0 {
-                        self.instruction_pointer = self.bracket_map[self.instruction_pointer];
+                        instruction_pointer = self.bracket_map[instruction_pointer];
                     }
                 }
                 b'.' => {
                     print!("{}", self.memory[self.data_pointer] as char);
                 }
                 b',' => {
-                    let mut buffer = [0; 1];
-
-                    match io::stdin().read_exact(&mut buffer) {
-                        Ok(_) => self.memory[self.data_pointer] = buffer[0],
-                        Err(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
-                            // EOF - leave cell unchanged as per spec
-                        }
-                        Err(err) => return Err(BrainfuckError::IoError(err)),
-                    }
+                    self.fn_comma()?;
                 }
                 _ => {
                     // Ignore non-command characters
                 }
             }
 
-            self.instruction_pointer += 1;
+            instruction_pointer += 1;
         }
         #[cfg(any(test, debug_assertions))]
         eprintln!("Debug: Flushing output buffer");
@@ -156,7 +167,7 @@ impl BrainfuckInterpreter {
         #[cfg(any(test, debug_assertions))]
         eprintln!(
             "Debug: Execution completed after {} instructions",
-            self.instruction_pointer
+            instruction_pointer
         );
 
         Ok(())
