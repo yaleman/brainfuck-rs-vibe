@@ -19,9 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.4.2"
-      - name: "Run clippy (ignores errors, this is just a check)"
-        run: cargo clippy
-        continue-on-error: true
+        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: "Run clippy"
+        run: cargo clippy --all-targets
